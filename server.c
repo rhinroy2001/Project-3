@@ -14,6 +14,13 @@
 #include <netdb.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <stdbool.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/buffer.h>
+#include <stdint.h>
+#include <math.h>
+#include <assert.h>
 
 #define MAXBUFLEN 1000
 
@@ -40,6 +47,57 @@ void *get_in_addr(struct sockaddr *sa)
 
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
+
+int calcDecodeLength(const char* input){
+    int len = strlen(input);
+    int padding = 0;
+    if(input[len-1] == '=' && input[len-2] == '='){
+        padding = 2;
+    }else if(input[len-1] == '='){
+        padding = 1;
+    }
+    return (int) len * 0.75 - padding;
+}
+
+int Base64Encode(const unsigned char* buffer, size_t length, char** b64text) { //Encodes a string to base64
+    BIO *bio, *b64;
+	BUF_MEM *bufferPtr;
+
+	b64 = BIO_new(BIO_f_base64());
+	bio = BIO_new(BIO_s_mem());
+	bio = BIO_push(b64, bio);
+
+	BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL); //Ignore newlines - write everything in one line
+	BIO_write(bio, buffer, length);
+	BIO_flush(bio);
+	BIO_get_mem_ptr(bio, &bufferPtr);
+	BIO_set_close(bio, BIO_NOCLOSE);
+	BIO_free_all(bio);
+
+	*b64text=(*bufferPtr).data;
+
+	return (0); //success
+}
+
+int Base64Decode(char* b64message, char** buffer, size_t* length){ //Decodes a base64 encoded string
+    BIO *bio, *b64;
+
+	int decodeLen = calcDecodeLength(b64message);
+	*buffer = (unsigned char*)malloc(decodeLen + 1);
+	(*buffer)[decodeLen] = '\0';
+
+	bio = BIO_new_mem_buf(b64message, -1);
+	b64 = BIO_new(BIO_f_base64());
+	bio = BIO_push(b64, bio);
+
+	BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL); //Do not use newlines to flush buffer
+	*length = BIO_read(bio, *buffer, strlen(b64message));
+	assert(*length == decodeLen); //length should equal decodeLen, else something went horribly wrong
+	BIO_free_all(bio);
+
+	return (0); //success
+}
+
 
 void* communicateWithSender(char* smtpPortNumber){
     int sockfd;
@@ -78,6 +136,25 @@ void* communicateWithSender(char* smtpPortNumber){
     struct hostent *host_entry;
     char* ip;
     char* prevMessage;
+    bool authenticated = false;
+    char passwordWithSalt[13];
+    char* salt = "SNOWY22";
+    char* base64EncodeOutput;
+    char* base64DecodeOutput;
+    time_t t;
+    srand((unsigned) time(&t));
+    const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    char passwordNoSalt[5];
+    int passwordSize = 5;
+    char* username;
+    char userPassCombo[100];
+    bool firstTimeUser = true;
+    char* storedUsername;
+    char* storedPassword;
+    char passwordResponse[100];
+    char* enteredPassword;
+    char* passwordAndSalt;
+    size_t decodeLength;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET; // set to AF_INET to use IPv4
@@ -119,6 +196,7 @@ void* communicateWithSender(char* smtpPortNumber){
     addr_len = sizeof(their_addr);
 
     rv = mkdir("db", 0755);
+    rv = mkdir("db/passwords", 0755);
     
     while(1){
         portNumberi++;
@@ -168,7 +246,118 @@ void* communicateWithSender(char* smtpPortNumber){
                 }
                 printf("%s\n", replyCode);
             }
-
+             for(;;){
+                bzero(buf, sizeof(buf));
+                if ((numbytes = recvfrom(newfd, buf, MAXBUFLEN-1 , 0, (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+                    perror("recvfrom");
+                    exit(1);
+                }
+                if(strncmp("AUTH", buf, 4) == 0){
+                    replyCode = "334 dXN1cm5hbWU6\nEnter username:";
+                    prevMessage = "AUTH"; 
+                    if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                        perror("sendto");
+                        exit(1);
+                    }
+                    printf("%s\n", replyCode);
+                }else if(strncmp("AUTH", prevMessage, 4) == 0){
+                    buf[strcspn(buf, "\n")] = '\0';
+                    username = buf;
+                    prevMessage = "password"; 
+                    fp = fopen("db/passwords/.user_pass", "r");
+                    if(fp != NULL){
+                        bzero(buf, sizeof buf);
+                        while(fgets(buf, sizeof buf, fp)){
+                            storedUsername = strtok(buf, ":");
+                            if(strcmp(username, storedUsername) == 0){
+                                firstTimeUser = false;
+                                break;
+                            }
+                        }
+                        fclose(fp);
+                    }
+                    printf("we got here (after if fp null)\n");
+                    if(firstTimeUser){
+                        for(int i = 0; i < passwordSize; i++){
+                            int key = rand() % (int) (sizeof charset - 1);
+                            passwordNoSalt[i] = charset[key];
+                        }
+                        passwordNoSalt[passwordSize] = '\0';
+                        sprintf(passwordWithSalt, "%s%s", salt, passwordNoSalt);
+                        printf("%s\n", passwordWithSalt);
+                        bzero(path, sizeof path);
+                        sprintf(path, "db/passwords/.user_pass");
+                        sprintf(userPassCombo, "%s:%s", username, passwordWithSalt);
+                        fp = fopen(path, "w");
+                        fputs(userPassCombo, fp);
+                        fclose(fp);
+                        replyCode = "330 PASSWORD CREATED";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }   
+                        if((rv = sendto(newfd, passwordNoSalt, sizeof(passwordNoSalt), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }else{
+                        replyCode = "334 cGFzc3dvcmQ6\nEnter password:";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }
+                }else if(strncmp("password", prevMessage, 8) == 0){
+                    buf[strcspn(buf, "\n")] = '\0';
+                    enteredPassword = buf;
+                    bzero(passwordWithSalt, sizeof passwordWithSalt);
+                    sprintf(passwordWithSalt, "SNOWY22%s", enteredPassword);
+                    bzero(path, sizeof path);
+                    sprintf(path, "db/passwords/.user_pass");
+                    fp = fopen(path, "r");
+                    bzero(buf, sizeof buf);
+                    if(fp != NULL){
+                        printf("we get here\n");
+                        while(fgets(buf, sizeof buf, fp)){
+                            printf("we get here?\n");
+                            char* temp = strtok(buf, ":");
+                            storedPassword = strtok(NULL, ":");
+                            if((strcmp(passwordWithSalt, storedPassword) == 0) && strcmp(username, storedUsername) == 0){
+                                authenticated = true;
+                            }
+                        }
+                        fclose(fp);
+                    }
+                    // we are here work on authentication
+                    if(authenticated){
+                        replyCode = "235 USER AUTHENTICATED";
+                        prevMessage = "HELO";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                        break;
+                    }else{
+                        replyCode = "535 USER AUTHENTICATION FAILED\nEnter password:";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }
+                }else{
+                    replyCode = "500 command unrecognized";
+                    prevMessage = "";
+                    if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                        perror("sendto");
+                        exit(1);
+                    }
+                    printf("%s\n", replyCode);
+                }
+             }
 
             for(;;){
 
@@ -202,7 +391,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         }
                         printf("%s\n", replyCode);
                     }
-                }else if(strncmp("MAIL FROM", buf, 9) == 0 && strncmp("HELO", prevMessage, 4) == 0){
+                }else if(strncmp("MAIL FROM", buf, 9) == 0 && authenticated && strncmp("HELO", prevMessage, 4) == 0){
                     mailFrom = buf;
                     parse = strtok(mailFrom, "<");
                     while(parse != NULL){
@@ -291,6 +480,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         printf("%s\n", replyCode);
                     }
                 }else if(strncmp(prevMessage, "DATA", 4) == 0){
+                    bzero(path, sizeof path);
                     prevMessage = "HELO";
                     replyCode = "250 OK\n";
                     sprintf(path, "db/%s/%d.email", recipient, num);
@@ -548,6 +738,17 @@ int main(int argc, char* argv[])
             httpPortNumber = temp;
         }
     }
+
+    // char* base64EncodeOutput, *text="Hello World";
+    // Base64Encode(text, strlen(text), &base64EncodeOutput);
+    // printf("Output (base64): %s\n", base64EncodeOutput);
+
+    // char* base64DecodeOutput;
+    // size_t test;
+    // Base64Decode(base64EncodeOutput, &base64DecodeOutput, &test);
+    // printf("Output: %s %d\n", base64DecodeOutput, test);
+    // return 0;
+    
 
     if(!fork()){
         communicateWithSender(smtpPortNumber);
