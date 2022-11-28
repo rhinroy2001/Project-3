@@ -53,22 +53,24 @@ int Base64Encode(const unsigned char* buffer, size_t length, char** b64text) { /
 	return (0); //success
 }
 
-char *Base64Decode(char* input, int length){ //Decodes a base64 encoded string
-    BIO *b64, *bmem;
+int Base64Decode(char* b64message, char** buffer, size_t* length){ //Decodes a base64 encoded string
+    BIO *bio, *b64;
 
-	char *buffer = (char*)malloc(length);
-	memset(buffer, 0, length);
+	int decodeLen = calcDecodeLength(b64message);
+	*buffer = (unsigned char*)malloc(decodeLen + 1);
+	(*buffer)[decodeLen] = '\0';
 
-	bmem = BIO_new_mem_buf(input, length);
+	bio = BIO_new_mem_buf(b64message, -1);
 	b64 = BIO_new(BIO_f_base64());
-	bmem = BIO_push(b64, bmem);
+	bio = BIO_push(b64, bio);
 
-	BIO_set_flags(bmem, BIO_FLAGS_BASE64_NO_NL); //Do not use newlines to flush buffer
-	BIO_read(bmem, buffer, length);
-	//assert(*length == decodeLen); //length should equal decodeLen, else something went horribly wrong
-	BIO_free_all(bmem);
+	BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL); //Do not use newlines to flush buffer
+	*length = BIO_read(bio, *buffer, strlen(b64message));
+    printf("length: %d | decodeLen: %d", length, decodeLen);
+	// assert(*length == decodeLen); //length should equal decodeLen, else something went horribly wrong
+	BIO_free_all(bio);
 
-	return buffer; //success
+	return (0); //success
 }
 
 
@@ -92,7 +94,7 @@ int main(int argc, char *argv[])
     int j;
     int k;
     socklen_t addr_len;
-    char* password;
+    char password[20];
     char* base64DecodeOutput;
     bool firstTimeUser = false;
     size_t decodeLength;
@@ -206,7 +208,7 @@ int main(int argc, char *argv[])
                 perror("recvfrom");
                 exit(1);
             }
-            password = buf;
+            strcpy(password, buf);
             printf("This is your password %s\n", password);
             printf("Connection will reset in 5 seconds\n");
             for(int i = 5; i > 0; i--){
@@ -293,22 +295,6 @@ int main(int argc, char *argv[])
             }
             printf("%s\n", buf);
             if(strncmp(buf, "221 BYE", 7) == 0){
-                break;
-            }
-            if(strncmp(buf, "330", 3) == 0){
-                firstTimeUser = true;
-                temp = strtok(buf, ":");
-                while(temp != NULL){
-                    password = temp;
-                    temp = strtok(NULL, ":");
-                }
-                base64DecodeOutput = Base64Decode(password, strlen(password));
-                printf("This is your password %s\n", base64DecodeOutput);
-                printf("Connection will reset in 5 seconds\n");
-                for(int i = 5; i > 0; i--){
-                    printf("%d\n", i);
-                    sleep(1);
-                }
                 break;
             }
         }

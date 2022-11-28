@@ -142,19 +142,21 @@ void* communicateWithSender(char* smtpPortNumber){
     char* base64EncodeOutput;
     char* base64DecodeOutput;
     time_t t;
-    srand((unsigned) time(&t));
     const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     char passwordNoSalt[5];
     int passwordSize = 5;
-    char* username;
+    char username[100];
     char userPassCombo[100];
     bool firstTimeUser = true;
     char* storedUsername;
     char* storedPassword;
     char passwordResponse[100];
-    char* enteredPassword;
+    char enteredPassword[20];
     char* passwordAndSalt;
     size_t decodeLength;
+    char fileBuf[100];
+    char moniker[100];
+    char* passwordNoSaltEncrypted;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET; // set to AF_INET to use IPv4
@@ -262,13 +264,14 @@ void* communicateWithSender(char* smtpPortNumber){
                     printf("%s\n", replyCode);
                 }else if(strncmp("AUTH", prevMessage, 4) == 0){
                     buf[strcspn(buf, "\n")] = '\0';
-                    username = buf;
+                    strcpy(username, buf);
                     prevMessage = "password"; 
                     fp = fopen("db/passwords/.user_pass", "r");
                     if(fp != NULL){
-                        bzero(buf, sizeof buf);
-                        while(fgets(buf, sizeof buf, fp)){
-                            storedUsername = strtok(buf, ":");
+                        bzero(fileBuf, sizeof fileBuf);
+                        while(fgets(fileBuf, sizeof fileBuf, fp)){
+                            storedUsername = strtok(fileBuf, ":");
+                            printf("username: %s | storedUsername: %s\n", username, storedUsername);
                             if(strcmp(username, storedUsername) == 0){
                                 firstTimeUser = false;
                                 break;
@@ -276,19 +279,19 @@ void* communicateWithSender(char* smtpPortNumber){
                         }
                         fclose(fp);
                     }
-                    printf("we got here (after if fp null)\n");
                     if(firstTimeUser){
+                        bzero(passwordNoSalt, sizeof passwordNoSalt);
+                        srand((unsigned) time(&t));
                         for(int i = 0; i < passwordSize; i++){
                             int key = rand() % (int) (sizeof charset - 1);
                             passwordNoSalt[i] = charset[key];
                         }
                         passwordNoSalt[passwordSize] = '\0';
                         sprintf(passwordWithSalt, "%s%s", salt, passwordNoSalt);
-                        printf("%s\n", passwordWithSalt);
                         bzero(path, sizeof path);
                         sprintf(path, "db/passwords/.user_pass");
-                        sprintf(userPassCombo, "%s:%s", username, passwordWithSalt);
-                        fp = fopen(path, "w");
+                        sprintf(userPassCombo, "%s:%s\n", username, passwordWithSalt);
+                        fp = fopen(path, "a");
                         fputs(userPassCombo, fp);
                         fclose(fp);
                         replyCode = "330 PASSWORD CREATED";
@@ -296,7 +299,7 @@ void* communicateWithSender(char* smtpPortNumber){
                             perror("sendto");
                             exit(1);
                         }   
-                        if((rv = sendto(newfd, passwordNoSalt, sizeof(passwordNoSalt), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                        if((rv = sendto(newfd, passwordNoSalt, strlen(passwordNoSalt), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                             perror("sendto");
                             exit(1);
                         }
@@ -310,21 +313,18 @@ void* communicateWithSender(char* smtpPortNumber){
                         printf("%s\n", replyCode);
                     }
                 }else if(strncmp("password", prevMessage, 8) == 0){
-                    buf[strcspn(buf, "\n")] = '\0';
-                    enteredPassword = buf;
+                    strcpy(enteredPassword, buf);
                     bzero(passwordWithSalt, sizeof passwordWithSalt);
                     sprintf(passwordWithSalt, "SNOWY22%s", enteredPassword);
                     bzero(path, sizeof path);
                     sprintf(path, "db/passwords/.user_pass");
                     fp = fopen(path, "r");
-                    bzero(buf, sizeof buf);
                     if(fp != NULL){
-                        printf("we get here\n");
-                        while(fgets(buf, sizeof buf, fp)){
-                            printf("we get here?\n");
-                            char* temp = strtok(buf, ":");
+                        bzero(fileBuf, sizeof fileBuf);
+                        while(fgets(fileBuf, sizeof fileBuf, fp)){
+                            storedUsername = strtok(fileBuf, ":");
                             storedPassword = strtok(NULL, ":");
-                            if((strcmp(passwordWithSalt, storedPassword) == 0) && strcmp(username, storedUsername) == 0){
+                            if((strcmp(passwordWithSalt, storedPassword) == 0) && (strcmp(username, storedUsername) == 0)){
                                 authenticated = true;
                             }
                         }
@@ -402,11 +402,19 @@ void* communicateWithSender(char* smtpPortNumber){
                         }
                     }
                     parse = strtok(temp, "@");
+                    strcpy(moniker, parse);
                     sprintf(from, "From: <%s@447f22.edu>\n", parse);
                     parse = strtok(NULL, "@");
-                    if(strncmp(parse, "447f22.edu>", 11) == 0){
+                    if((strncmp(parse, "447f22.edu>", 11) == 0) && (strcmp(moniker, username) == 0)){
                         prevMessage = "MAIL FROM";
                         replyCode = "250 OK";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }else if(strcmp(moniker, username) != 0){
+                        replyCode = "535 USERNAME AND MONIKER DO NOT MATCH";
                         if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                             perror("sendto");
                             exit(1);
