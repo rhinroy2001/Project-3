@@ -1,6 +1,7 @@
 {
     "files.associations": {
-        "ssl.h": "c"
+        "ssl.h": "c",
+        "stdbool.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

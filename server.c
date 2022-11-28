@@ -48,54 +48,20 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-int calcDecodeLength(const char* input){
-    int len = strlen(input);
-    int padding = 0;
-    if(input[len-1] == '=' && input[len-2] == '='){
-        padding = 2;
-    }else if(input[len-1] == '='){
-        padding = 1;
-    }
-    return (int) len * 0.75 - padding;
+ char *Base64Encode(const unsigned char* input, int length) {
+    int predictedLength = 4 * ((length + 2) / 3);
+    char* output = (char *)(calloc(predictedLength + 1, 1));
+    int outputLength = EVP_EncodeBlock((unsigned char *)(output), input, length);
+    assert(predictedLength == outputLength);
+    return output;
 }
 
-int Base64Encode(const unsigned char* buffer, size_t length, char** b64text) { //Encodes a string to base64
-    BIO *bio, *b64;
-	BUF_MEM *bufferPtr;
-
-	b64 = BIO_new(BIO_f_base64());
-	bio = BIO_new(BIO_s_mem());
-	bio = BIO_push(b64, bio);
-
-	BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL); //Ignore newlines - write everything in one line
-	BIO_write(bio, buffer, length);
-	BIO_flush(bio);
-	BIO_get_mem_ptr(bio, &bufferPtr);
-	BIO_set_close(bio, BIO_NOCLOSE);
-	BIO_free_all(bio);
-
-	*b64text=(*bufferPtr).data;
-
-	return (0); //success
-}
-
-int Base64Decode(char* b64message, char** buffer, size_t* length){ //Decodes a base64 encoded string
-    BIO *bio, *b64;
-
-	int decodeLen = calcDecodeLength(b64message);
-	*buffer = (unsigned char*)malloc(decodeLen + 1);
-	(*buffer)[decodeLen] = '\0';
-
-	bio = BIO_new_mem_buf(b64message, -1);
-	b64 = BIO_new(BIO_f_base64());
-	bio = BIO_push(b64, bio);
-
-	BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL); //Do not use newlines to flush buffer
-	*length = BIO_read(bio, *buffer, strlen(b64message));
-	assert(*length == decodeLen); //length should equal decodeLen, else something went horribly wrong
-	BIO_free_all(bio);
-
-	return (0); //success
+char *Base64Decode(char* input, int length){ //Decodes a base64 encoded string
+    int predictedLength = 3 * length / 4;
+    char* output = (unsigned char *)(calloc(predictedLength + 1, 1));
+    int outputLength = EVP_DecodeBlock(output, (unsigned char *)(input), length);
+    assert(predictedLength == outputLength);
+    return output;
 }
 
 
