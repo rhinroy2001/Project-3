@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #define MAXBUFLEN 1000
 
@@ -41,6 +42,9 @@ int main(int argc, char *argv[])
     FILE *fp;
     char path[40];
     char confirmation[10];
+    int fileCount = 0;
+    struct dirent *res;
+    struct stat sb;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET; // set to AF_INET to use IPv4
@@ -98,7 +102,34 @@ int main(int argc, char *argv[])
             if(ptr){
                 *ptr = '\0';
             }
-            strcpy(username, buf);       
+            strcpy(username, buf);
+            if ((numbytes = sendto(sockfd, username, sizeof(username), 0, p->ai_addr, p->ai_addrlen)) == -1) {
+                perror("talker: sendto");
+                exit(1);
+            }
+
+            bzero(path, sizeof path);
+            sprintf(path, "%s",username);
+            if(stat(path, &sb) == 0 && S_ISDIR(sb.st_mode)){
+                DIR *folder = opendir(path);
+                if(access (path, F_OK) != -1){
+                    if(folder){
+                        while((res = readdir(folder))){
+                            if(strcmp(res->d_name, ".") && strcmp(res->d_name, "..")){
+                                fileCount++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            bzero(buf, sizeof buf);
+            if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) ipAddress, &addr_len) == -1)){
+                perror("recvfrom");
+                exit(1);
+            }
+            printf("%s\n", buf);
+
         
             bzero(buf, sizeof(buf));
             printf("Enter the number of emails to download: ");
@@ -124,25 +155,27 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
 
-                bzero(buf, sizeof(buf));
-                addr_len = sizeof(ipAddress);
-                if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) ipAddress, &addr_len) == -1)){
-                    perror("recvfrom");
-                    exit(1);
-                }
-
                 printf("%s\n", buf);
-
-                sprintf(path, "%s/request.txt", username);
-                fp = fopen(path, "w");
-                if(fp != NULL){
-                    for(int i = 0; i < MAXBUFLEN; i++){
-                        fputc(buf[i], fp);
+                printf("fileCount: %d | numEmails: %s", fileCount, numEmails);
+                for(int i = fileCount + 1; i <= atoi(numEmails) + fileCount; i++){
+                    bzero(buf, sizeof(buf));
+                    if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) ipAddress, &addr_len) == -1)){
+                        perror("recvfrom");
+                        exit(1);
                     }
-                }else{
-                    printf("Error creating file");
-                }
-                fclose(fp);  
+                    printf("%s\n", buf);
+                    bzero(path, sizeof path);
+                    sprintf(path, "%s/request%d.txt", username, i);
+                    fp = fopen(path, "w");
+                    if(fp != NULL){
+                        for(int i = 0; i < MAXBUFLEN; i++){
+                            fputc(buf[i], fp);
+                        }
+                    }else{
+                        printf("Error creating file");
+                    }
+                    fclose(fp); 
+                } 
                 break;
             }else{
                 // repeat process

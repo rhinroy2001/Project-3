@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <assert.h>
+#include <dirent.h>
 
 #define MAXBUFLEN 1000
 
@@ -195,6 +196,7 @@ void* communicateWithSender(char* smtpPortNumber){
             }
             int newfd = socket(AF_INET, SOCK_DGRAM, 0);
             bind(newfd, p->ai_addr, p->ai_addrlen);
+
             if(strncmp("HELO", buf, 4) == 0){
                 helo = buf;
                 parse = strtok(helo, " ");
@@ -253,6 +255,73 @@ void* communicateWithSender(char* smtpPortNumber){
                 fputs(servlogBuf, servlogfp);
                 fclose(servlogfp);
                 printf("%s\n", replyCode);
+                while(1){
+                    bzero(buf, sizeof buf);
+                    if ((numbytes = recvfrom(newfd, buf, MAXBUFLEN-1 , 0, (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+                        perror("recvfrom");
+                        exit(1);
+                    }
+                    if(strncmp("HELO", buf, 4) == 0){
+                        helo = buf;
+                        parse = strtok(helo, " ");
+                        parse = strtok(NULL, " ");
+                        if(strncmp(parse, "447f22.edu", 10) == 0){
+                            replyCode = "250 OK";
+                            prevMessage = "HELO";
+                            bzero(buf, sizeof(buf));
+                            sprintf(buf, "%s %s greets %s", replyCode, ip, client.host);
+                            if((rv = sendto(newfd, buf, sizeof(buf), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                                perror("sendto");
+                                exit(1);
+                            }
+                            bzero(timeNow, sizeof timeNow);
+                            strcpy(timeNow, asctime(ptm));
+                            timeNow[strcspn(timeNow, "\r\n")] = '\0';
+                            bzero(servlogBuf, sizeof servlogBuf);
+                            sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, buf);
+                            printf("%s", servlogBuf);
+                            servlogfp = fopen(".server_log", "a");
+                            fputs(servlogBuf, servlogfp);
+                            fclose(servlogfp);
+                            printf("%s\n", buf);
+                            break;
+                        }else{
+                            replyCode = "501 DOMAIN NOT SUPPORTED";
+                            prevMessage = "";
+                            if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                                perror("sendto");
+                                exit(1);
+                            }
+                            bzero(timeNow, sizeof timeNow);
+                            strcpy(timeNow, asctime(ptm));
+                            timeNow[strcspn(timeNow, "\r\n")] = '\0';
+                            bzero(servlogBuf, sizeof servlogBuf);
+                            sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                            printf("%s", servlogBuf);
+                            servlogfp = fopen(".server_log", "a");
+                            fputs(servlogBuf, servlogfp);
+                            fclose(servlogfp);
+                            printf("%s\n", replyCode);
+                        }
+                    }else{
+                        replyCode = "500 command unrecognized";
+                        prevMessage = "";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        bzero(timeNow, sizeof timeNow);
+                        strcpy(timeNow, asctime(ptm));
+                        timeNow[strcspn(timeNow, "\r\n")] = '\0';
+                        bzero(servlogBuf, sizeof servlogBuf);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        printf("%s", servlogBuf);
+                        servlogfp = fopen(".server_log", "a");
+                        fputs(servlogBuf, servlogfp);
+                        fclose(servlogfp);
+                        printf("%s\n", replyCode);
+                    }
+                }
             }
              for(;;){
                 bzero(buf, sizeof(buf));
@@ -767,9 +836,13 @@ void* commincateWithReceiver(char* httpPortNumber){
     char temp[20];
     char host[256];
     char hostname[258];
-    int emailCount;
+    int emailCount = 0;
     time_t now = time(&now);
     struct tm *ptm = gmtime(&now);
+    struct dirent *res;
+    struct stat sb;
+    struct dirent *dir;
+    DIR *d;
     
     
 
@@ -812,6 +885,7 @@ void* commincateWithReceiver(char* httpPortNumber){
     addr_len = sizeof(their_addr); 
     
     for(;;){
+        emailCount = 0;
         gethostname(host, sizeof(host));
         sprintf(hostname, "<%s>", host);
         replyCode = "";
@@ -820,6 +894,44 @@ void* commincateWithReceiver(char* httpPortNumber){
             perror("recvfrom");
             exit(1);
         }
+        strcpy(recipient, buf);
+        recipient[strcspn(recipient, "\n")] = '\0';
+        bzero(path, sizeof path);
+        sprintf(path, "db/%s", recipient);
+        if(stat(path, &sb) == 0 && S_ISDIR(sb.st_mode)){
+            DIR *folder = opendir(path);
+            if(access (path, F_OK) != -1){
+                if(folder){
+                    while((res = readdir(folder))){
+                        if(strcmp(res->d_name, ".") && strcmp(res->d_name, "..")){
+                            emailCount++;
+                        }
+                    }
+                }
+            }
+        }else{
+            replyCode = "400 USER DOES NOT EXIST";
+            if((rv = sendto(sockfd, buf, sizeof buf, 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                perror("sendto");
+                exit(1);
+            }
+            printf("%s\n", replyCode);
+            exit(1);
+            
+        }
+        bzero(buf, sizeof buf);
+        sprintf(buf, "You have %d unread emails", emailCount);
+        if((rv = sendto(sockfd, buf, sizeof buf, 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+            perror("sendto");
+            exit(1);
+        }
+        printf("%s\n", buf);
+
+        if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0, (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+            perror("recvfrom");
+            exit(1);
+        }
+
         
         if(strncmp("GET", buf, 3) == 0){
             request = buf;
@@ -861,41 +973,40 @@ void* commincateWithReceiver(char* httpPortNumber){
             count = parse;
             emailCount = atoi(count);
             sprintf(dateTime, "%s", asctime(ptm));
-            printf("Server: %s Hostname: %s", server, hostname);
-            if(strcmp(server, hostname) == 0){
-                bzero(buf, sizeof(buf));
-                
+            printf("Server: %s Hostname: %s\n", server, hostname);
+            if(strcmp(server, hostname) == 0){                
                 sprintf(buf, "HTTP/1.1 200 OK\nLast-Modified: %s\nCount: %d\nContent-Type: text/plain\n\n", dateTime, emailCount);
+                printf("%s", buf);
                 for(int i = 1; i <= emailCount; i++){
-                    int n = 0;
+                        int n = 0;
                     sprintf(path, "%s/%s/%d.email", db, recipient, i);
-                    char fbuf[1000];
-                    FILE *fp;
+                        char fbuf[1000];
+                        FILE *fp;
                     fp = fopen(path, "r");
-                    if(fp != NULL){
-                        do{
-                            fbuf[n] = fgetc(fp);
-                            if(feof(fp)){
-                                break;
+                        if(fp != NULL){
+                            do{
+                                fbuf[n] = fgetc(fp);
+                                if(feof(fp)){
+                                    break;
+                                }
+                                n++;
+                            }while(1);
+                            fclose(fp);
+                            remove(path);
+                            if((rv = sendto(sockfd, fbuf, MAXBUFLEN, 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                                perror("sendto");
+                                exit(1);
                             }
-                            n++;
-                        }while(1);
-                        fclose(fp);
-                        strcat(buf, fbuf);
-                    }else{
-                        replyCode = "404 FILE DOES NOT EXIST\n";
-                        if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                            perror("sendto");
-                            exit(1);
+                            printf("%s\n", fbuf);
+                        }else{
+                            replyCode = "404 FILE DOES NOT EXIST\n";
+                            if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                                perror("sendto");
+                                exit(1);
+                            }
+                            printf("%s\n", replyCode);
                         }
-                        printf("%s\n", replyCode);
-                    }
                 }
-                if((rv = sendto(sockfd, buf, MAXBUFLEN, 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                    perror("sendto");
-                    exit(1);
-                }
-                printf("%s\n", buf);
             }else{
                 replyCode = "400 BAD REQUEST\n";
                 if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
@@ -926,8 +1037,11 @@ int main(int argc, char* argv[])
     char* httpPortToken;
     char* httpPortNumber;
     char* ipAddress;
-    int count = 0;
-    pthread_t tid[10];
+    FILE* fp;
+    char domain[50];
+    char domainIp[50];
+    char domainPort[50];
+    char line[100];
 
     FILE* file = fopen(argv[1], "r");
     if(file == NULL){
@@ -951,6 +1065,16 @@ int main(int argc, char* argv[])
             httpPortNumber = temp;
         }
     }
+
+    fp = fopen(".domains", "w");
+    while(fscanf(file, "%s %s %s", domain, domainIp, domainPort)){
+        sprintf(line, "%s:%s:%s", domain, domainIp, domainPort);
+        fputs(line, fp);
+    }
+    fclose(fp);
+    fclose(file);
+
+
 
     // char* base64EncodeOutput, *text="Hello World";
     // Base64Encode(text, strlen(text), &base64EncodeOutput);
