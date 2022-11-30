@@ -63,6 +63,9 @@ int main(int argc, char *argv[])
     bool firstTimeUser = false;
     size_t decodeLength;
     int newfd;
+    char* base64EncodeOutput;
+    char pbuf[MAXDATASIZE];
+    int passwordSize = 5;
 
     // read in port number and IP address from file
     FILE* file = fopen(argv[1], "r");
@@ -149,14 +152,29 @@ int main(int argc, char *argv[])
                 }
                 n++;
             }
+            if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len) == -1)) {
+                perror("talker: sendto");
+                exit(1);
+            }
+        }else if(strncmp(buf, "334 cGFzc3dvcmQ6", 16) == 0){
+            bzero(buf, sizeof(buf));
+            while((buf[n++] = getchar()) != '\n');
+            buf[strcspn(buf, "\n")] = '\0';
+            base64EncodeOutput = Base64Encode(buf, passwordSize);
+            if ((numbytes = sendto(sockfd, base64EncodeOutput, strlen(base64EncodeOutput), 0, (struct sockaddr*) &their_addr, addr_len) == -1)) {
+            perror("talker: sendto");
+            exit(1);
+            }
+            
         }else{
             bzero(buf, sizeof(buf));
             while((buf[n++] = getchar()) != '\n');
+            if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len) == -1)) {
+                perror("talker: sendto");
+                exit(1);
+            }
         }
-        if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len) == -1)) {
-            perror("talker: sendto");
-            exit(1);
-        }
+        
         bzero(buf, sizeof(buf));
         if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
             perror("recvfrom");
@@ -168,13 +186,15 @@ int main(int argc, char *argv[])
         }
         if(strncmp(buf, "330", 3) == 0){
             firstTimeUser = true;
-            bzero(buf, sizeof buf);
-            if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
+            bzero(pbuf, sizeof pbuf);
+            if((numbytes = recvfrom(sockfd, pbuf, sizeof(pbuf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
                 perror("recvfrom");
                 exit(1);
             }
-            strcpy(password, buf);
-            printf("This is your password %s\n", password);
+            strcpy(password, pbuf);
+            printf("encrypted password: %s", password);
+            base64DecodeOutput = Base64Decode(password, strlen(password));
+            printf("This is your password %s\n", base64DecodeOutput);
             printf("Connection will reset in 5 seconds\n");
             for(int i = 5; i > 0; i--){
                 sleep(1);
@@ -245,13 +265,27 @@ int main(int argc, char *argv[])
                     }
                     n++;
                 }
+                if ((numbytes = sendto(newfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len) == -1)) {
+                    perror("talker: sendto");
+                    exit(1);
+                }
+            }else if(strncmp(buf, "334 cGFzc3dvcmQ6", 16) == 0){
+                bzero(buf, sizeof(buf));
+                while((buf[n++] = getchar()) != '\n');
+                buf[strcspn(buf, "\n")] = '\0';
+                base64EncodeOutput = Base64Encode(buf, 7);
+                printf("base64EncodeOutput: %s\n", base64EncodeOutput);
+                if ((numbytes = sendto(sockfd, base64EncodeOutput, strlen(base64EncodeOutput), 0, (struct sockaddr*) &their_addr, addr_len) == -1)) {
+                    perror("talker: sendto");
+                    exit(1);
+                }  
             }else{
                 bzero(buf, sizeof(buf));
                 while((buf[n++] = getchar()) != '\n');
-            }
-            if ((numbytes = sendto(newfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len) == -1)) {
-                perror("talker: sendto");
-                exit(1);
+                if ((numbytes = sendto(newfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len) == -1)) {
+                    perror("talker: sendto");
+                    exit(1);
+                }
             }
             bzero(buf, sizeof(buf));
             if((numbytes = recvfrom(newfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){

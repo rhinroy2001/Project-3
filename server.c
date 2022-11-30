@@ -65,6 +65,20 @@ char *Base64Decode(char* input, int length){ //Decodes a base64 encoded string
     return output;
 }
 
+void removeChar(char* str, char character){
+    int i, j;
+    int len = strlen(str);
+    for(i = 0; i < len; i++){
+        if(str[i] == character){
+            for(j = i; j < len; j++){
+                str[j] = str[j + 1];
+            }
+            len--;
+            i--;
+        }
+    }
+}
+
 int communicateWithServer(char* domain, char* ip, char* port, char* from, char* to, char* email, char* selfDomain){
     struct addrinfo hints, *servinfo, *p;
     struct sockaddr_in their_addr;
@@ -234,7 +248,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
     bool authenticated = false;
     char passwordWithSalt[13];
     char* salt = "SNOWY22";
-    char* base64EncodeOutput;
+    char* encryptedPasswordNoSalt;
     char* base64DecodeOutput;
     time_t t;
     const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -246,7 +260,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
     char* storedUsername;
     char* storedPassword;
     char passwordResponse[100];
-    char enteredPassword[20];
+    char enteredPassword[6];
     char* passwordAndSalt;
     size_t decodeLength;
     char fileBuf[100];
@@ -266,6 +280,8 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
     char* domainIpToken;
     char* domainPortToken;
     char servlogPath[100];
+    char* encryptedPasswordWithSalt;
+    char* base64EncodeOutput;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET; // set to AF_INET to use IPv4
@@ -518,7 +534,6 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         bzero(fileBuf, sizeof fileBuf);
                         while(fgets(fileBuf, sizeof fileBuf, fp)){
                             storedUsername = strtok(fileBuf, ":");
-                            printf("username: %s | storedUsername: %s\n", username, storedUsername);
                             if(strcmp(username, storedUsername) == 0){
                                 firstTimeUser = false;
                                 break;
@@ -534,10 +549,13 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                             passwordNoSalt[i] = charset[key];
                         }
                         passwordNoSalt[passwordSize] = '\0';
+                        printf("passwordNoSalt: %s\n", passwordNoSalt);
+                        encryptedPasswordNoSalt = Base64Encode(passwordNoSalt, sizeof passwordNoSalt);
                         sprintf(passwordWithSalt, "%s%s", salt, passwordNoSalt);
+                        encryptedPasswordWithSalt = Base64Encode(passwordWithSalt, sizeof passwordWithSalt);
                         bzero(path, sizeof path);
                         sprintf(path, "db/passwords/%s.user_pass", serverDomain);
-                        sprintf(userPassCombo, "%s:%s\n", username, passwordWithSalt);
+                        sprintf(userPassCombo, "%s:%s\n", username, encryptedPasswordWithSalt);
                         fp = fopen(path, "a");
                         fputs(userPassCombo, fp);
                         fclose(fp);
@@ -547,7 +565,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                             perror("sendto");
                             exit(1);
                         }   
-                        if((rv = sendto(newfd, passwordNoSalt, strlen(passwordNoSalt), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                        if((rv = sendto(newfd, encryptedPasswordNoSalt, strlen(encryptedPasswordNoSalt), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                             perror("sendto");
                             exit(1);
                         }
@@ -580,8 +598,11 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     }
                 }else if(strncmp("password", prevMessage, 8) == 0){
                     strcpy(enteredPassword, buf);
+                    enteredPassword[passwordSize + 3] = '\0';
+                    base64DecodeOutput = Base64Decode(enteredPassword, strlen(enteredPassword));
                     bzero(passwordWithSalt, sizeof passwordWithSalt);
-                    sprintf(passwordWithSalt, "SNOWY22%s", enteredPassword);
+                    sprintf(passwordWithSalt, "SNOWY22%s", base64DecodeOutput);
+                    base64EncodeOutput = Base64Encode(passwordWithSalt, sizeof passwordWithSalt);
                     bzero(path, sizeof path);
                     sprintf(path, "db/passwords/%s.user_pass", serverDomain);
                     fp = fopen(path, "r");
@@ -590,13 +611,13 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         while(fgets(fileBuf, sizeof fileBuf, fp)){
                             storedUsername = strtok(fileBuf, ":");
                             storedPassword = strtok(NULL, ":");
-                            if((strcmp(passwordWithSalt, storedPassword) == 0) && (strcmp(username, storedUsername) == 0)){
+                            storedPassword[strcspn(storedPassword, "\n")] = '\0';
+                            if((strcmp(base64EncodeOutput, storedPassword) == 0) && (strcmp(username, storedUsername) == 0)){
                                 authenticated = true;
                             }
                         }
                         fclose(fp);
                     }
-                    // we are here work on authentication
                     if(authenticated){
                         replyCode = "235 USER AUTHENTICATED";
                         prevMessage = "HELO";
@@ -1249,20 +1270,6 @@ void* commincateWithReceiver(char* httpPortNumber, char* domain){
         }
     }
     close(sockfd);
-}
-
-void removeChar(char* str, char character){
-    int i, j;
-    int len = strlen(str);
-    for(i = 0; i < len; i++){
-        if(str[i] == character){
-            for(j = i; j < len; j++){
-                str[j] = str[j + 1];
-            }
-            len--;
-            i--;
-        }
-    }
 }
 
 int main(int argc, char* argv[])
