@@ -87,12 +87,6 @@ int communicateWithServer(char* domain, char* ip, char* port, char* from, char* 
     int numbytes;
     socklen_t addr_len;
     char buf[1000];
-    // come back to this if you have time
-    // time_t now = time(&now);
-    // struct tm *ptm = gmtime(&now);
-    // char timeNow[100];
-    // char servlogBuf[1000];
-    // char servlogPath[100];
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET; // set to AF_INET to use IPv4
@@ -370,7 +364,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     strcpy(timeNow, asctime(ptm));
                     timeNow[strcspn(timeNow, "\r\n")] = '\0';
                     bzero(servlogBuf, sizeof servlogBuf);
-                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, buf);
+                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, buf);
                     printf("%s", servlogBuf);
                     servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
@@ -387,7 +381,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     strcpy(timeNow, asctime(ptm));
                     timeNow[strcspn(timeNow, "\r\n")] = '\0';
                     bzero(servlogBuf, sizeof servlogBuf);
-                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                     printf("%s", servlogBuf);
                     servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
@@ -405,7 +399,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                 strcpy(timeNow, asctime(ptm));
                 timeNow[strcspn(timeNow, "\r\n")] = '\0';
                 bzero(servlogBuf, sizeof servlogBuf);
-                sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                 servlogfp = fopen(servlogPath, "a");
                 fputs(servlogBuf, servlogfp);
                 fclose(servlogfp);
@@ -434,7 +428,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                             strcpy(timeNow, asctime(ptm));
                             timeNow[strcspn(timeNow, "\r\n")] = '\0';
                             bzero(servlogBuf, sizeof servlogBuf);
-                            sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, buf);
+                            sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, buf);
                             printf("%s", servlogBuf);
                             servlogfp = fopen(servlogPath, "a");
                             fputs(servlogBuf, servlogfp);
@@ -452,7 +446,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                             strcpy(timeNow, asctime(ptm));
                             timeNow[strcspn(timeNow, "\r\n")] = '\0';
                             bzero(servlogBuf, sizeof servlogBuf);
-                            sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                            sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                             printf("%s", servlogBuf);
                             servlogfp = fopen(servlogPath, "a");
                             fputs(servlogBuf, servlogfp);
@@ -470,7 +464,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -489,7 +483,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                 strcpy(timeNow, asctime(ptm));
                 timeNow[strcspn(timeNow, "\r\n")] = '\0';
                 bzero(servlogBuf, sizeof servlogBuf);
-                sprintf(servlogBuf, "%s %s %s * %s\n", timeNow, client.host, ip, receiveDescription);
+                sprintf(servlogBuf, "%s %s %s * %s\n", timeNow, ip, client.host, receiveDescription);
                 printf("%s", servlogBuf);
                 servlogfp = fopen(servlogPath, "a");
                 fputs(servlogBuf, servlogfp);
@@ -516,7 +510,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     strcpy(timeNow, asctime(ptm));
                     timeNow[strcspn(timeNow, "\r\n")] = '\0';
                     bzero(servlogBuf, sizeof servlogBuf);
-                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                     printf("%s", servlogBuf);
                     servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
@@ -573,7 +567,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -589,7 +583,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s 334 cGFzc3dvcmQ6\n", timeNow, client.host, ip);
+                        sprintf(servlogBuf, "%s %s %s 334 cGFzc3dvcmQ6\n", timeNow, ip, client.host);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -629,7 +623,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -646,7 +640,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s 535 USER AUTHENTICATION FAILED\n", timeNow, client.host, ip);
+                        sprintf(servlogBuf, "%s %s %s 535 USER AUTHENTICATION FAILED\n", timeNow, ip, client.host);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -664,7 +658,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     strcpy(timeNow, asctime(ptm));
                     timeNow[strcspn(timeNow, "\r\n")] = '\0';
                     bzero(servlogBuf, sizeof servlogBuf);
-                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                     printf("%s", servlogBuf);
                     servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
@@ -686,7 +680,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                 strcpy(timeNow, asctime(ptm));
                 timeNow[strcspn(timeNow, "\r\n")] = '\0';
                 bzero(servlogBuf, sizeof servlogBuf);
-                sprintf(servlogBuf, "%s %s %s * %s\n", timeNow, client.host, ip, receiveDescription);
+                sprintf(servlogBuf, "%s %s %s * %s\n", timeNow, ip, client.host, receiveDescription);
                 printf("%s", servlogBuf);
                 servlogfp = fopen(servlogPath, "a");
                 fputs(servlogBuf, servlogfp);
@@ -708,7 +702,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, buf);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, buf);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -725,7 +719,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -758,7 +752,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -774,7 +768,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -790,7 +784,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -853,7 +847,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                             strcpy(timeNow, asctime(ptm));
                             timeNow[strcspn(timeNow, "\r\n")] = '\0';
                             bzero(servlogBuf, sizeof servlogBuf);
-                            sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                            sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                             printf("%s", servlogBuf);
                             servlogfp = fopen(servlogPath, "a");
                             fputs(servlogBuf, servlogfp);
@@ -869,7 +863,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                             strcpy(timeNow, asctime(ptm));
                             timeNow[strcspn(timeNow, "\r\n")] = '\0';
                             bzero(servlogBuf, sizeof servlogBuf);
-                            sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                            sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                             printf("%s", servlogBuf);
                             servlogfp = fopen(servlogPath, "a");
                             fputs(servlogBuf, servlogfp);
@@ -886,7 +880,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -906,7 +900,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -922,7 +916,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -941,7 +935,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -963,7 +957,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -993,7 +987,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         strcpy(timeNow, asctime(ptm));
                         timeNow[strcspn(timeNow, "\r\n")] = '\0';
                         bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                         printf("%s", servlogBuf);
                         servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
@@ -1011,7 +1005,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     strcpy(timeNow, asctime(ptm));
                     timeNow[strcspn(timeNow, "\r\n")] = '\0';
                     bzero(servlogBuf, sizeof servlogBuf);
-                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                     printf("%s", servlogBuf);
                     servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
@@ -1027,7 +1021,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     strcpy(timeNow, asctime(ptm));
                     timeNow[strcspn(timeNow, "\r\n")] = '\0';
                     bzero(servlogBuf, sizeof servlogBuf);
-                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                     printf("%s", servlogBuf);
                     servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
@@ -1043,7 +1037,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     strcpy(timeNow, asctime(ptm));
                     timeNow[strcspn(timeNow, "\r\n")] = '\0';
                     bzero(servlogBuf, sizeof servlogBuf);
-                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
                     printf("%s", servlogBuf);
                     servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
