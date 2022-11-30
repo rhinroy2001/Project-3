@@ -379,7 +379,6 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     printf("%s\n", replyCode);
                 }
             }else{
-                printf("1\n");
                 replyCode = "500 command unrecognized";
                 prevMessage = "";
                 if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
@@ -445,7 +444,6 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                             printf("%s\n", replyCode);
                         }
                     }else{
-                        printf("2\n");
                         replyCode = "500 command unrecognized";
                         prevMessage = "";
                         if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
@@ -635,7 +633,6 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         printf("%s\n", replyCode);
                     }
                 }else{
-                    printf("3\n");
                     replyCode = "500 command unrecognized";
                     prevMessage = "";
                     if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
@@ -1016,7 +1013,6 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     fclose(servlogfp);
                     printf("%s\n", replyCode);
                 }else{
-                    printf("4\n");
                     replyCode = "500 command unrecognized";
                     if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                         perror("sendto");

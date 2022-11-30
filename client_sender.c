@@ -183,7 +183,6 @@ int main(int argc, char *argv[])
             break;
         }
     }
-    printf("we get here\n");
     freeaddrinfo(servinfo);
     close(sockfd);
 
