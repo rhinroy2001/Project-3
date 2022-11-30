@@ -519,7 +519,6 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
                     fclose(servlogfp);
-                    printf("%s\n", buf);
                     printf("%s\n", replyCode);
                 }else if(strncmp("AUTH", prevMessage, 4) == 0){
                     buf[strcspn(buf, "\n")] = '\0';
