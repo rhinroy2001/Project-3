@@ -319,6 +319,10 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
     rv = mkdir("db", 0755);
     rv = mkdir("db/passwords", 0755);
 
+    bzero(path, sizeof path);
+    sprintf(path, "db/%susers", serverDomain);
+    rv = mkdir(path, 0755);
+
     while(1){
         portNumberi++;
         sprintf(portNumber, "%d", portNumberi);
@@ -805,7 +809,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                             }
                             parse = strtok(temp, "@");
                             strcpy(recipient, parse);
-                            sprintf(path, "db/%s", recipient);
+                            sprintf(path, "db/%susers/%s", serverDomain, recipient);
                             rv = mkdir(path, 0755);
                             parse = strtok(NULL, "@");
                             parse[strcspn(parse, "\n")] = '\0';
@@ -968,7 +972,7 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         prevMessage = "HELO";
                         replyCode = "250 OK";
                         bzero(path, sizeof path);
-                        sprintf(path, "db//%s/%d.email", recipient, num);
+                        sprintf(path, "db/%susers/%s/%d.email", serverDomain, recipient, num);
                         num++;
                         sprintf(dateTime, "Date: %s", asctime(ptm));
                         fp = fopen(path, "w");
@@ -1136,7 +1140,7 @@ void* commincateWithReceiver(char* httpPortNumber, char* domain){
         strcpy(recipient, buf);
         recipient[strcspn(recipient, "\n")] = '\0';
         bzero(path, sizeof path);
-        sprintf(path, "db/%s", recipient);
+        sprintf(path, "db/%susers/%s", domain, recipient);
         if(stat(path, &sb) == 0 && S_ISDIR(sb.st_mode)){
             DIR *folder = opendir(path);
             if(access (path, F_OK) != -1){
@@ -1218,7 +1222,7 @@ void* commincateWithReceiver(char* httpPortNumber, char* domain){
                 printf("%s", buf);
                 for(int i = 1; i <= emailCount; i++){
                         int n = 0;
-                    sprintf(path, "%s/%s/%d.email", db, recipient, i);
+                    sprintf(path, "%s/%susers/%s/%d.email", db, domain, recipient, i);
                         char fbuf[1000];
                         FILE *fp;
                     fp = fopen(path, "r");
