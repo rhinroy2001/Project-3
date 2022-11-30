@@ -65,8 +65,135 @@ char *Base64Decode(char* input, int length){ //Decodes a base64 encoded string
     return output;
 }
 
+int communicateWithServer(char* domain, char* ip, char* port, char* from, char* to, char* email, char* selfDomain){
+    struct addrinfo hints, *servinfo, *p;
+    struct sockaddr_in their_addr;
+    int sockfd;
+    int rv;
+    int numbytes;
+    socklen_t addr_len;
+    char buf[1000];
+    // come back to this if you have time
+    // time_t now = time(&now);
+    // struct tm *ptm = gmtime(&now);
+    // char timeNow[100];
+    // char servlogBuf[1000];
+    // char servlogPath[100];
 
-void* communicateWithSender(char* smtpPortNumber){
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET; // set to AF_INET to use IPv4
+    hints.ai_socktype = SOCK_DGRAM;
+
+    if ((rv = getaddrinfo(ip, port, &hints, &servinfo)) != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+        return 1;
+    }
+
+    // loop through all the results and make a socket
+    for(p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sockfd = socket(p->ai_family, p->ai_socktype,
+                p->ai_protocol)) == -1) {
+            perror("talker: socket");
+            continue;
+        }
+
+        break;
+    }
+
+    if (p == NULL) {
+        fprintf(stderr, "talker: failed to create socket\n");
+        return 2;
+    }
+
+    bzero(buf, sizeof buf);
+    sprintf(buf, "HELO %s.edu", domain);
+    if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, p->ai_addr, p->ai_addrlen)) == -1) {
+        perror("talker: sendto");
+        exit(1);
+    }
+
+    addr_len = sizeof(their_addr);
+    bzero(buf, sizeof(buf));
+    if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
+        perror("recvfrom");
+        exit(1);
+    }
+    printf("%s\n", buf);
+
+    bzero(buf, sizeof buf);
+    sprintf(buf, "AUTH rasta#22smtp");
+    if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len)) == -1) {
+        perror("talker: sendto");
+        exit(1);
+    }
+
+    bzero(buf, sizeof buf);
+    if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
+        perror("recvfrom");
+        exit(1);
+    }
+    printf("%s\n", buf);
+
+    bzero(buf, sizeof buf);
+    sprintf(buf, "MAIL FROM: <%s@%s.edu>", from, selfDomain);
+    if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len)) == -1) {
+        perror("talker: sendto");
+        exit(1);
+    }
+
+    bzero(buf, sizeof buf);
+    if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
+        perror("recvfrom");
+        exit(1);
+    }
+    printf("%s\n", buf);
+
+    bzero(buf, sizeof buf);
+    sprintf(buf, "RCPT TO: <%s@%s.edu>", to, domain);
+    if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len)) == -1) {
+        perror("talker: sendto");
+        exit(1);
+    }
+
+    bzero(buf, sizeof buf);
+    if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
+        perror("recvfrom");
+        exit(1);
+    }
+    printf("%s\n", buf);
+
+    bzero(buf, sizeof buf);
+    sprintf(buf, "DATA");
+    if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len)) == -1) {
+        perror("talker: sendto");
+        exit(1);
+    }
+
+    bzero(buf, sizeof buf);
+    if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
+        perror("recvfrom");
+        exit(1);
+    }
+    printf("%s\n", buf);
+
+    if ((numbytes = sendto(sockfd, email, strlen(email), 0, (struct sockaddr*) &their_addr, addr_len)) == -1) {
+        perror("talker: sendto");
+        exit(1);
+    }
+
+    bzero(buf, sizeof buf);
+    if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
+        perror("recvfrom");
+        exit(1);
+    }
+    printf("%s\n", buf);
+
+    return 0;
+
+}
+
+
+void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
     struct sockaddr_in their_addr;
@@ -125,9 +252,20 @@ void* communicateWithSender(char* smtpPortNumber){
     char fileBuf[100];
     char moniker[100];
     char* passwordNoSaltEncrypted;
-    char servlogBuf[1000];;
+    char servlogBuf[1000];
     char* receiveDescription = "sent message";
     char timeNow[100];
+    char selfDomain[20];
+    bool isServer = false;
+    char* domain;
+    char domainLine[100];
+    bool domainAccepted = false;
+    char writer[100];
+    char* domainIp;
+    char* domainPort;
+    char* domainIpToken;
+    char* domainPortToken;
+    char servlogPath[100];
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET; // set to AF_INET to use IPv4
@@ -170,7 +308,7 @@ void* communicateWithSender(char* smtpPortNumber){
 
     rv = mkdir("db", 0755);
     rv = mkdir("db/passwords", 0755);
-    
+
     while(1){
         portNumberi++;
         sprintf(portNumber, "%d", portNumberi);
@@ -186,7 +324,8 @@ void* communicateWithSender(char* smtpPortNumber){
         bzero(servlogBuf, sizeof servlogBuf);
         sprintf(servlogBuf, "%s %s %s * %s\n", timeNow, client.host, ip, receiveDescription);
         printf("%s", servlogBuf);
-        servlogfp = fopen(".server_log", "a");
+        sprintf(servlogPath, "%s.server_log", serverDomain);
+        servlogfp = fopen(servlogPath, "a");
         fputs(servlogBuf, servlogfp);
         fclose(servlogfp);
         if(!fork()){
@@ -201,7 +340,8 @@ void* communicateWithSender(char* smtpPortNumber){
                 helo = buf;
                 parse = strtok(helo, " ");
                 parse = strtok(NULL, " ");
-                if(strncmp(parse, "447f22.edu", 10) == 0){
+                parse[strcspn(parse, "\n")] = '\0';
+                if(strcmp(parse, serverDomain) == 0){
                     replyCode = "250 OK";
                     prevMessage = "HELO";
                     bzero(buf, sizeof(buf));
@@ -216,7 +356,7 @@ void* communicateWithSender(char* smtpPortNumber){
                     bzero(servlogBuf, sizeof servlogBuf);
                     sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, buf);
                     printf("%s", servlogBuf);
-                    servlogfp = fopen(".server_log", "a");
+                    servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
                     fclose(servlogfp);
                     printf("%s\n", buf);
@@ -233,7 +373,7 @@ void* communicateWithSender(char* smtpPortNumber){
                     bzero(servlogBuf, sizeof servlogBuf);
                     sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                     printf("%s", servlogBuf);
-                    servlogfp = fopen(".server_log", "a");
+                    servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
                     fclose(servlogfp);
                     printf("%s\n", replyCode);
@@ -250,8 +390,7 @@ void* communicateWithSender(char* smtpPortNumber){
                 timeNow[strcspn(timeNow, "\r\n")] = '\0';
                 bzero(servlogBuf, sizeof servlogBuf);
                 sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
-                printf("%s", servlogBuf);
-                servlogfp = fopen(".server_log", "a");
+                servlogfp = fopen(servlogPath, "a");
                 fputs(servlogBuf, servlogfp);
                 fclose(servlogfp);
                 printf("%s\n", replyCode);
@@ -265,7 +404,8 @@ void* communicateWithSender(char* smtpPortNumber){
                         helo = buf;
                         parse = strtok(helo, " ");
                         parse = strtok(NULL, " ");
-                        if(strncmp(parse, "447f22.edu", 10) == 0){
+                        parse[strcspn(parse, "\n")] = '\0';
+                        if(strcmp(parse, serverDomain) == 0){
                             replyCode = "250 OK";
                             prevMessage = "HELO";
                             bzero(buf, sizeof(buf));
@@ -280,7 +420,7 @@ void* communicateWithSender(char* smtpPortNumber){
                             bzero(servlogBuf, sizeof servlogBuf);
                             sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, buf);
                             printf("%s", servlogBuf);
-                            servlogfp = fopen(".server_log", "a");
+                            servlogfp = fopen(servlogPath, "a");
                             fputs(servlogBuf, servlogfp);
                             fclose(servlogfp);
                             printf("%s\n", buf);
@@ -298,7 +438,7 @@ void* communicateWithSender(char* smtpPortNumber){
                             bzero(servlogBuf, sizeof servlogBuf);
                             sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                             printf("%s", servlogBuf);
-                            servlogfp = fopen(".server_log", "a");
+                            servlogfp = fopen(servlogPath, "a");
                             fputs(servlogBuf, servlogfp);
                             fclose(servlogfp);
                             printf("%s\n", replyCode);
@@ -316,7 +456,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
@@ -335,10 +475,21 @@ void* communicateWithSender(char* smtpPortNumber){
                 bzero(servlogBuf, sizeof servlogBuf);
                 sprintf(servlogBuf, "%s %s %s * %s\n", timeNow, client.host, ip, receiveDescription);
                 printf("%s", servlogBuf);
-                servlogfp = fopen(".server_log", "a");
+                servlogfp = fopen(servlogPath, "a");
                 fputs(servlogBuf, servlogfp);
                 fclose(servlogfp);
-                if(strncmp("AUTH", buf, 4) == 0){
+                if(strncmp("AUTH rasta#22smtp", buf, 17) == 0){
+                    replyCode = "235 AUTHENTICATION BYPASSED";
+                    prevMessage = "HELO";
+                    if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                        perror("sendto");
+                        exit(1);
+                    }
+                    authenticated = true;
+                    isServer = true;
+                    printf("%s\n", replyCode);
+                    break;
+                }else if(strncmp("AUTH", buf, 4) == 0){
                     replyCode = "334 dXN1cm5hbWU6\nEnter username:";
                     prevMessage = "AUTH"; 
                     if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
@@ -351,7 +502,7 @@ void* communicateWithSender(char* smtpPortNumber){
                     bzero(servlogBuf, sizeof servlogBuf);
                     sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                     printf("%s", servlogBuf);
-                    servlogfp = fopen(".server_log", "a");
+                    servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
                     fclose(servlogfp);
                     printf("%s\n", buf);
@@ -359,8 +510,10 @@ void* communicateWithSender(char* smtpPortNumber){
                 }else if(strncmp("AUTH", prevMessage, 4) == 0){
                     buf[strcspn(buf, "\n")] = '\0';
                     strcpy(username, buf);
-                    prevMessage = "password"; 
-                    fp = fopen("db/passwords/.user_pass", "r");
+                    prevMessage = "password";
+                    bzero(path, sizeof path);
+                    sprintf(path, "db/passwords/%s.user_pass", serverDomain); 
+                    fp = fopen(path, "r");
                     if(fp != NULL){
                         bzero(fileBuf, sizeof fileBuf);
                         while(fgets(fileBuf, sizeof fileBuf, fp)){
@@ -383,7 +536,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         passwordNoSalt[passwordSize] = '\0';
                         sprintf(passwordWithSalt, "%s%s", salt, passwordNoSalt);
                         bzero(path, sizeof path);
-                        sprintf(path, "db/passwords/.user_pass");
+                        sprintf(path, "db/passwords/%s.user_pass", serverDomain);
                         sprintf(userPassCombo, "%s:%s\n", username, passwordWithSalt);
                         fp = fopen(path, "a");
                         fputs(userPassCombo, fp);
@@ -403,7 +556,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
@@ -419,7 +572,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s 334 cGFzc3dvcmQ6\n", timeNow, client.host, ip);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
@@ -429,7 +582,7 @@ void* communicateWithSender(char* smtpPortNumber){
                     bzero(passwordWithSalt, sizeof passwordWithSalt);
                     sprintf(passwordWithSalt, "SNOWY22%s", enteredPassword);
                     bzero(path, sizeof path);
-                    sprintf(path, "db/passwords/.user_pass");
+                    sprintf(path, "db/passwords/%s.user_pass", serverDomain);
                     fp = fopen(path, "r");
                     if(fp != NULL){
                         bzero(fileBuf, sizeof fileBuf);
@@ -456,7 +609,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
@@ -473,7 +626,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s 535 USER AUTHENTICATION FAILED\n", timeNow, client.host, ip);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
@@ -491,7 +644,7 @@ void* communicateWithSender(char* smtpPortNumber){
                     bzero(servlogBuf, sizeof servlogBuf);
                     sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                     printf("%s", servlogBuf);
-                    servlogfp = fopen(".server_log", "a");
+                    servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
                     fclose(servlogfp);
                     printf("%s\n", replyCode);
@@ -513,7 +666,7 @@ void* communicateWithSender(char* smtpPortNumber){
                 bzero(servlogBuf, sizeof servlogBuf);
                 sprintf(servlogBuf, "%s %s %s * %s\n", timeNow, client.host, ip, receiveDescription);
                 printf("%s", servlogBuf);
-                servlogfp = fopen(".server_log", "a");
+                servlogfp = fopen(servlogPath, "a");
                 fputs(servlogBuf, servlogfp);
                 fclose(servlogfp);
                 if(strncmp("HELO", buf, 4) == 0 && strcmp("", prevMessage) == 0){
@@ -535,7 +688,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, buf);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", buf);
@@ -552,7 +705,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
@@ -569,9 +722,10 @@ void* communicateWithSender(char* smtpPortNumber){
                     }
                     parse = strtok(temp, "@");
                     strcpy(moniker, parse);
-                    sprintf(from, "From: <%s@447f22.edu>\n", parse);
+                    sprintf(from, "From: <%s@%s>\n", moniker, serverDomain);
                     parse = strtok(NULL, "@");
-                    if((strncmp(parse, "447f22.edu>", 11) == 0) && (strcmp(moniker, username) == 0)){
+                    parse[strcspn(parse, "\n")] = '\0';
+                    if(((strcmp(parse, serverDomain) == 62) && (strcmp(moniker, username) == 0)) || isServer){
                         prevMessage = "MAIL FROM";
                         replyCode = "250 OK";
                         if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
@@ -584,7 +738,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
@@ -600,7 +754,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
@@ -616,29 +770,57 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
                     }
                 }else if(strncmp("RCPT TO", buf, 7) == 0){
                     if(strncmp("MAIL FROM", prevMessage, 10) == 0){
-                        rcptTo = buf;
-                        parse = strtok(rcptTo, "<");
-                        while(parse != NULL){
-                            temp = parse;
-                            parse = strtok(NULL, "<");
-                            if(parse == NULL){
-                                break;
+                        if(!isServer){
+                            rcptTo = buf;
+                            parse = strtok(rcptTo, "<");
+                            while(parse != NULL){
+                                temp = parse;
+                                parse = strtok(NULL, "<");
+                                if(parse == NULL){
+                                    break;
+                                }
                             }
+                            parse = strtok(temp, "@");
+                            strcpy(recipient, parse);
+                            sprintf(path, "db/%s", recipient);
+                            rv = mkdir(path, 0755);
+                            parse = strtok(NULL, "@");
+                            parse[strcspn(parse, "\n")] = '\0';
+                            if((strcmp(parse, serverDomain) == 62)){
+                                domainAccepted = true;
+                            }else{
+                                bzero(path, sizeof path);
+                                sprintf(path, "%sdomains.txt", serverDomain);
+                                fp = fopen(path, "r");
+                                while(fscanf(fp, "%s", domainLine) == 1){
+                                    char temp1[40];
+                                    domain = strtok(domainLine, ":");
+                                    domainIp = strtok(NULL, ":");
+                                    domainPort = strtok(NULL, ":");
+                                    domainIpToken = strtok(domainIp, "=");
+                                    domainIp = strtok(NULL, "=");
+                                    domainPortToken = strtok(domainPort, "=");
+                                    domainPort = strtok(NULL, "=");
+                                    snprintf(temp1, 40, "%s.edu>", domain);
+                                    if((strcmp(parse, temp1) == 0)){
+                                        domainAccepted = true;
+                                        break;
+                                    }
+                                }
+                                fclose(fp);
+                            }
+                        }else{
+                            domainAccepted = true;
                         }
-                        parse = strtok(temp, "@");
-                        strcpy(recipient, parse);
-                        sprintf(path, "db/%s", parse);
-                        sprintf(to, "To: <%s@447f22.edu>\n", recipient);
-                        parse = strtok(NULL, "@");
-                        rv = mkdir(path, 0755);
-                        if(strncmp(parse, "447f22.edu>", 11) == 0){
+                        if(domainAccepted){
+                            sprintf(to, "To: <%s@%s>\n", recipient, domain);
                             prevMessage = "RCPT TO";
                             replyCode = "250 OK";
                             if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
@@ -651,7 +833,7 @@ void* communicateWithSender(char* smtpPortNumber){
                             bzero(servlogBuf, sizeof servlogBuf);
                             sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                             printf("%s", servlogBuf);
-                            servlogfp = fopen(".server_log", "a");
+                            servlogfp = fopen(servlogPath, "a");
                             fputs(servlogBuf, servlogfp);
                             fclose(servlogfp);
                             printf("%s\n", replyCode);
@@ -667,7 +849,7 @@ void* communicateWithSender(char* smtpPortNumber){
                             bzero(servlogBuf, sizeof servlogBuf);
                             sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                             printf("%s", servlogBuf);
-                            servlogfp = fopen(".server_log", "a");
+                            servlogfp = fopen(servlogPath, "a");
                             fputs(servlogBuf, servlogfp);
                             fclose(servlogfp);
                             printf("%s\n", replyCode);
@@ -684,7 +866,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
@@ -704,7 +886,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
@@ -720,41 +902,82 @@ void* communicateWithSender(char* smtpPortNumber){
                         bzero(servlogBuf, sizeof servlogBuf);
                         sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                         printf("%s", servlogBuf);
-                        servlogfp = fopen(".server_log", "a");
+                        servlogfp = fopen(servlogPath, "a");
                         fputs(servlogBuf, servlogfp);
                         fclose(servlogfp);
                         printf("%s\n", replyCode);
                     }
                 }else if(strncmp(prevMessage, "DATA", 4) == 0){
-                    bzero(path, sizeof path);
-                    prevMessage = "HELO";
-                    replyCode = "250 OK";
-                    sprintf(path, "db/%s/%d.email", recipient, num);
-                    num++;
-                    sprintf(dateTime, "Date: %s", asctime(ptm));
-                    fp = fopen(path, "w");
-                    fputs(dateTime, fp);
-                    fputs(from, fp);
-                    fputs(to, fp);
-                    for(int i = 0; i < MAXBUFLEN; i++){
-                        fputc(buf[i], fp);
-                    }
-                    fclose(fp);
-                    if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                        perror("sendto");
-                        exit(1);
-                    }
-                    bzero(timeNow, sizeof timeNow);
-                    strcpy(timeNow, asctime(ptm));
-                    timeNow[strcspn(timeNow, "\r\n")] = '\0';
-                    bzero(servlogBuf, sizeof servlogBuf);
-                    sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
-                    printf("%s", servlogBuf);
-                    servlogfp = fopen(".server_log", "a");
-                    fputs(servlogBuf, servlogfp);
-                    fclose(servlogfp);
-                    printf("%s\n", replyCode);
+                    if(isServer){
+                        prevMessage = "HELO";
+                        replyCode = "250 OK";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        bzero(timeNow, sizeof timeNow);
+                        strcpy(timeNow, asctime(ptm));
+                        timeNow[strcspn(timeNow, "\r\n")] = '\0';
+                        bzero(servlogBuf, sizeof servlogBuf);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        printf("%s", servlogBuf);
+                        servlogfp = fopen(servlogPath, "a");
+                        fputs(servlogBuf, servlogfp);
+                        fclose(servlogfp);
+                        printf("%s\n", replyCode);
+                    }else if(domain != NULL){
+                        prevMessage = "HELO";
+                        replyCode = "250 OK";
+                        char sendFrom[50];
+                        char sendTo[50];
+                        sprintf(sendFrom, "MAIL FROM: <%s@%s>", moniker, serverDomain);
+                        sprintf(sendTo, "RCPT TO: <%s@%s>", recipient, domain);
+                        communicateWithServer(domain, domainIp, domainPort, sendFrom, sendTo, buf, serverDomain);
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        bzero(timeNow, sizeof timeNow);
+                        strcpy(timeNow, asctime(ptm));
+                        timeNow[strcspn(timeNow, "\r\n")] = '\0';
+                        bzero(servlogBuf, sizeof servlogBuf);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        printf("%s", servlogBuf);
+                        servlogfp = fopen(servlogPath, "a");
+                        fputs(servlogBuf, servlogfp);
+                        fclose(servlogfp);
+                        printf("%s\n", replyCode);
 
+                    }else{
+                        prevMessage = "HELO";
+                        replyCode = "250 OK";
+                        bzero(path, sizeof path);
+                        sprintf(path, "db//%s/%d.email", recipient, num);
+                        num++;
+                        sprintf(dateTime, "Date: %s", asctime(ptm));
+                        fp = fopen(path, "w");
+                        fputs(dateTime, fp);
+                        fputs(from, fp);
+                        fputs(to, fp);
+                        for(int i = 0; i < MAXBUFLEN; i++){
+                            fputc(buf[i], fp);
+                        }
+                        fclose(fp);
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        bzero(timeNow, sizeof timeNow);
+                        strcpy(timeNow, asctime(ptm));
+                        timeNow[strcspn(timeNow, "\r\n")] = '\0';
+                        bzero(servlogBuf, sizeof servlogBuf);
+                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
+                        printf("%s", servlogBuf);
+                        servlogfp = fopen(servlogPath, "a");
+                        fputs(servlogBuf, servlogfp);
+                        fclose(servlogfp);
+                        printf("%s\n", replyCode);
+                    }
                 }else if(strncmp("HELP", buf, 4) == 0){
                     prevMessage = "";
                     replyCode = "214 OK\nHELO - HELO followed by email domain\nMAIL FROM - MAIL FROM: <email address>\nRCPT TO - RCPT TO: <email address>\nDATA - DATA then write text ending <CRLF>.<CRLF>\n";
@@ -768,7 +991,7 @@ void* communicateWithSender(char* smtpPortNumber){
                     bzero(servlogBuf, sizeof servlogBuf);
                     sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                     printf("%s", servlogBuf);
-                    servlogfp = fopen(".server_log", "a");
+                    servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
                     fclose(servlogfp);
                     printf("%s\n", replyCode);
@@ -784,7 +1007,7 @@ void* communicateWithSender(char* smtpPortNumber){
                     bzero(servlogBuf, sizeof servlogBuf);
                     sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                     printf("%s", servlogBuf);
-                    servlogfp = fopen(".server_log", "a");
+                    servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
                     fclose(servlogfp);
                     printf("%s\n", replyCode);
@@ -800,7 +1023,7 @@ void* communicateWithSender(char* smtpPortNumber){
                     bzero(servlogBuf, sizeof servlogBuf);
                     sprintf(servlogBuf, "%s %s %s %s\n", timeNow, client.host, ip, replyCode);
                     printf("%s", servlogBuf);
-                    servlogfp = fopen(".server_log", "a");
+                    servlogfp = fopen(servlogPath, "a");
                     fputs(servlogBuf, servlogfp);
                     fclose(servlogfp);
                     printf("%s\n", replyCode);
@@ -813,7 +1036,7 @@ void* communicateWithSender(char* smtpPortNumber){
     close(sockfd);
 }
 
-void* commincateWithReceiver(char* httpPortNumber){
+void* commincateWithReceiver(char* httpPortNumber, char* domain){
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
     struct sockaddr_storage their_addr;
@@ -1027,6 +1250,20 @@ void* commincateWithReceiver(char* httpPortNumber){
     close(sockfd);
 }
 
+void removeChar(char* str, char character){
+    int i, j;
+    int len = strlen(str);
+    for(i = 0; i < len; i++){
+        if(str[i] == character){
+            for(j = i; j < len; j++){
+                str[j] = str[j + 1];
+            }
+            len--;
+            i--;
+        }
+    }
+}
+
 int main(int argc, char* argv[])
 {
     char smtpPort[50];
@@ -1038,16 +1275,19 @@ int main(int argc, char* argv[])
     char* httpPortNumber;
     char* ipAddress;
     FILE* fp;
+    char selfDomain[50];
     char domain[50];
     char domainIp[50];
     char domainPort[50];
     char line[100];
+    char path[20];
 
     FILE* file = fopen(argv[1], "r");
     if(file == NULL){
     	perror("Cannot open the file");
 	    exit(1);
     }
+    fscanf(file, "%s", selfDomain);
     fscanf(file, "%s %s", smtpPort, httpPort);
     smtpPortToken = strtok(smtpPort, "=");
     while(smtpPortToken != NULL){
@@ -1066,9 +1306,16 @@ int main(int argc, char* argv[])
         }
     }
 
-    fp = fopen(".domains", "w");
-    while(fscanf(file, "%s %s %s", domain, domainIp, domainPort)){
-        sprintf(line, "%s:%s:%s", domain, domainIp, domainPort);
+    bzero(path, sizeof path);
+    removeChar(selfDomain, '[');
+    removeChar(selfDomain, ']');
+    sprintf(path, "%sdomains.txt", selfDomain);
+    fp = fopen(path, "w");
+    while(fscanf(file, "%s %s %s", domain, domainIp, domainPort) == 3){
+        removeChar(domain, '[');
+        removeChar(domain, ']');
+        bzero(line, sizeof line);
+        sprintf(line, "%s:%s:%s\n", domain, domainIp, domainPort);
         fputs(line, fp);
     }
     fclose(fp);
@@ -1088,9 +1335,9 @@ int main(int argc, char* argv[])
     
 
     if(!fork()){
-        communicateWithSender(smtpPortNumber);
+        communicateWithSender(smtpPortNumber, selfDomain);
     }
-    commincateWithReceiver(httpPortNumber);
+    commincateWithReceiver(httpPortNumber, selfDomain);
 
     return 0;
 }

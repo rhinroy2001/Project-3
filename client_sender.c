@@ -44,7 +44,6 @@ int main(int argc, char *argv[])
     struct addrinfo hints, *servinfo, *p;
     struct sockaddr_in their_addr;
     int sockfd;
-    int newfd;
     int rv;
     int numbytes;
     char buf[MAXDATASIZE];
@@ -63,6 +62,7 @@ int main(int argc, char *argv[])
     char* base64DecodeOutput;
     bool firstTimeUser = false;
     size_t decodeLength;
+    int newfd;
 
     // read in port number and IP address from file
     FILE* file = fopen(argv[1], "r");
