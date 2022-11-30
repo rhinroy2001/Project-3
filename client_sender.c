@@ -177,17 +177,18 @@ int main(int argc, char *argv[])
             printf("This is your password %s\n", password);
             printf("Connection will reset in 5 seconds\n");
             for(int i = 5; i > 0; i--){
-                printf("%d\n", i);
                 sleep(1);
+                printf("%d\n", i);
             }
             break;
         }
     }
+    printf("we get here\n");
+    freeaddrinfo(servinfo);
+    close(sockfd);
 
     if(firstTimeUser){
-        freeaddrinfo(servinfo);
-        close(sockfd);
-
+        n = 0;
         if ((rv = getaddrinfo(ipAddress, portNumber, &hints, &servinfo)) != 0) {
             fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
             return 1;
