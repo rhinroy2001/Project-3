@@ -156,7 +156,7 @@ int main(int argc, char *argv[])
                 perror("talker: sendto");
                 exit(1);
             }
-        }else if(strncmp(buf, "334 cGFzc3dvcmQ6", 16) == 0){
+        }else if(strncmp(buf, "334 cGFzc3dvcmQ6", 16) == 0 || strncmp(buf, "535 USER AUTHENTICATION FAILED", 30) == 0){
             bzero(buf, sizeof(buf));
             while((buf[n++] = getchar()) != '\n');
             buf[strcspn(buf, "\n")] = '\0';
@@ -269,12 +269,11 @@ int main(int argc, char *argv[])
                     perror("talker: sendto");
                     exit(1);
                 }
-            }else if(strncmp(buf, "334 cGFzc3dvcmQ6", 16) == 0){
+            }else if((strncmp(buf, "334 cGFzc3dvcmQ6", 16) == 0) || strncmp(buf, "535 USER AUTHENTICATION FAILED", 30) == 0){
                 bzero(buf, sizeof(buf));
                 while((buf[n++] = getchar()) != '\n');
                 buf[strcspn(buf, "\n")] = '\0';
                 base64EncodeOutput = Base64Encode(buf, 7);
-                printf("base64EncodeOutput: %s\n", base64EncodeOutput);
                 if ((numbytes = sendto(sockfd, base64EncodeOutput, strlen(base64EncodeOutput), 0, (struct sockaddr*) &their_addr, addr_len) == -1)) {
                     perror("talker: sendto");
                     exit(1);

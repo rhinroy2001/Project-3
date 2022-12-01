@@ -156,7 +156,6 @@ int main(int argc, char *argv[])
                 }
 
                 printf("%s\n", buf);
-                printf("fileCount: %d | numEmails: %s", fileCount, numEmails);
                 for(int i = fileCount + 1; i <= atoi(numEmails) + fileCount; i++){
                     bzero(buf, sizeof(buf));
                     if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) ipAddress, &addr_len) == -1)){

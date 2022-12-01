@@ -546,7 +546,6 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                             passwordNoSalt[i] = charset[key];
                         }
                         passwordNoSalt[passwordSize] = '\0';
-                        printf("passwordNoSalt: %s\n", passwordNoSalt);
                         encryptedPasswordNoSalt = Base64Encode(passwordNoSalt, sizeof passwordNoSalt);
                         sprintf(passwordWithSalt, "%s%s", salt, passwordNoSalt);
                         encryptedPasswordWithSalt = Base64Encode(passwordWithSalt, sizeof passwordWithSalt);
@@ -796,48 +795,43 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     }
                 }else if(strncmp("RCPT TO", buf, 7) == 0){
                     if(strncmp("MAIL FROM", prevMessage, 10) == 0){
-                        if(!isServer){
-                            rcptTo = buf;
-                            parse = strtok(rcptTo, "<");
-                            while(parse != NULL){
-                                temp = parse;
-                                parse = strtok(NULL, "<");
-                                if(parse == NULL){
+                        rcptTo = buf;
+                        parse = strtok(rcptTo, "<");
+                        while(parse != NULL){
+                            temp = parse;
+                            parse = strtok(NULL, "<");
+                            if(parse == NULL){
+                                break;
+                            }
+                        }
+                        parse = strtok(temp, "@");
+                        strcpy(recipient, parse);
+                        parse = strtok(NULL, "@");
+                        parse[strcspn(parse, "\n")] = '\0';
+                        if((strcmp(parse, serverDomain) == 62)){
+                            domainAccepted = true;
+                        }else{
+                            bzero(path, sizeof path);
+                            sprintf(path, "%sdomains.txt", serverDomain);
+                            fp = fopen(path, "r");
+                            while(fscanf(fp, "%s", domainLine) == 1){
+                                char temp1[40];
+                                domain = strtok(domainLine, ":");
+                                domainIp = strtok(NULL, ":");
+                                domainPort = strtok(NULL, ":");
+                                domainIpToken = strtok(domainIp, "=");
+                                domainIp = strtok(NULL, "=");
+                                domainPortToken = strtok(domainPort, "=");
+                                domainPort = strtok(NULL, "=");
+                                snprintf(temp1, 40, "%s.edu>", domain);
+                                if((strcmp(parse, temp1) == 0)){
+                                    domainAccepted = true;
                                     break;
                                 }
                             }
-                            parse = strtok(temp, "@");
-                            strcpy(recipient, parse);
-                            sprintf(path, "db/%susers/%s", serverDomain, recipient);
-                            rv = mkdir(path, 0755);
-                            parse = strtok(NULL, "@");
-                            parse[strcspn(parse, "\n")] = '\0';
-                            if((strcmp(parse, serverDomain) == 62)){
-                                domainAccepted = true;
-                            }else{
-                                bzero(path, sizeof path);
-                                sprintf(path, "%sdomains.txt", serverDomain);
-                                fp = fopen(path, "r");
-                                while(fscanf(fp, "%s", domainLine) == 1){
-                                    char temp1[40];
-                                    domain = strtok(domainLine, ":");
-                                    domainIp = strtok(NULL, ":");
-                                    domainPort = strtok(NULL, ":");
-                                    domainIpToken = strtok(domainIp, "=");
-                                    domainIp = strtok(NULL, "=");
-                                    domainPortToken = strtok(domainPort, "=");
-                                    domainPort = strtok(NULL, "=");
-                                    snprintf(temp1, 40, "%s.edu>", domain);
-                                    if((strcmp(parse, temp1) == 0)){
-                                        domainAccepted = true;
-                                        break;
-                                    }
-                                }
-                                fclose(fp);
-                            }
-                        }else{
-                            domainAccepted = true;
+                            fclose(fp);
                         }
+                        
                         if(domainAccepted){
                             sprintf(to, "To: <%s@%s>\n", recipient, domain);
                             prevMessage = "RCPT TO";
@@ -927,30 +921,13 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                         printf("%s\n", replyCode);
                     }
                 }else if(strncmp(prevMessage, "DATA", 4) == 0){
-                    if(isServer){
-                        prevMessage = "HELO";
-                        replyCode = "250 OK";
-                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                            perror("sendto");
-                            exit(1);
-                        }
-                        bzero(timeNow, sizeof timeNow);
-                        strcpy(timeNow, asctime(ptm));
-                        timeNow[strcspn(timeNow, "\r\n")] = '\0';
-                        bzero(servlogBuf, sizeof servlogBuf);
-                        sprintf(servlogBuf, "%s %s %s %s\n", timeNow, ip, client.host, replyCode);
-                        printf("%s", servlogBuf);
-                        servlogfp = fopen(servlogPath, "a");
-                        fputs(servlogBuf, servlogfp);
-                        fclose(servlogfp);
-                        printf("%s\n", replyCode);
-                    }else if(domain != NULL){
+                    if(domain != NULL){
                         prevMessage = "HELO";
                         replyCode = "250 OK";
                         char sendFrom[50];
                         char sendTo[50];
                         sprintf(sendFrom, "MAIL FROM: <%s@%s>", moniker, serverDomain);
-                        sprintf(sendTo, "RCPT TO: <%s@%s>", recipient, domain);
+                        sprintf(sendTo, "RCPT TO: <%s@%s.edu>", recipient, domain);
                         communicateWithServer(domain, domainIp, domainPort, sendFrom, sendTo, buf, serverDomain);
                         if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                             perror("sendto");
@@ -970,6 +947,9 @@ void* communicateWithSender(char* smtpPortNumber, char* serverDomain){
                     }else{
                         prevMessage = "HELO";
                         replyCode = "250 OK";
+                        bzero(path, sizeof path);
+                        sprintf(path, "db/%susers/%s", serverDomain, recipient);
+                        rv = mkdir(path, 0755);
                         bzero(path, sizeof path);
                         sprintf(path, "db/%susers/%s/%d.email", serverDomain, recipient, num);
                         num++;
